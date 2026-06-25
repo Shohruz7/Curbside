@@ -1,0 +1,30 @@
+# Runs the whole stack locally: mongo + api + client.
+# Start everything with:  docker compose up
+
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongoData:/data/db
+
+  server:
+    build: ./Backend
+    ports:
+      - "4000:4000"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/curbside
+      - JWT_SECRET=change_me
+    depends_on:
+      - mongo
+
+  client:
+    build: ./Frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server
+
+volumes:
+  mongoData:
