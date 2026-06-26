@@ -44,4 +44,4 @@ Image uploads go straight from the client to Cloudinary, which returns a hosted 
 
 ## Team
 
-Shohruzbek Abdumuminov, Sanjar Melikov, Ilobi Michael
+Shohruzbek Abdumuminov, Sanjar Melikov, Ilobi Michael, Sara Ahmed El Sayed
