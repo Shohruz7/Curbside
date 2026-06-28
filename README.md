@@ -34,6 +34,32 @@ Curbside has three layers:
 
 Image uploads go straight from the client to Cloudinary, which returns a hosted URL that is saved on the item. Image data never sits in the API or database. The client and API are both containerized with Docker and published to Docker Hub.
 
+## Project Structure
+
+```
+Backend/    Express REST API (Mongoose models, routes, JWT auth)
+Frontend/   React client (Vite, Tailwind, Leaflet)
+shared/     @curbside/shared — constants and JSDoc typedefs used by both
+```
+
+`shared/` is a small local package (`@curbside/shared`) that holds cross-cutting
+constants (item statuses, categories, reservation/expiry windows, validation
+limits, API error codes) and JSDoc type definitions. Both `Backend` and
+`Frontend` depend on it via `"@curbside/shared": "file:../shared"`, so the API
+and UI share one source of truth and cannot drift out of sync.
+
+## Running with Docker
+
+Docker builds use the **repo root** as the build context (see
+`docker-compose.yml`) so the `shared/` package is available to both images.
+Before starting, copy `.env.example` to `.env` and set a real `JWT_SECRET` —
+compose refuses to start the server without it:
+
+```
+cp .env.example .env   # then edit JWT_SECRET
+docker compose up
+```
+
 ## Tech Stack
 
 - **Frontend:** React, Tailwind CSS, React Router, Leaflet

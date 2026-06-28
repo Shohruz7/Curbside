@@ -1,0 +1,10 @@
+{
+  "name": "@curbside/shared",
+  "version": "0.1.0",
+  "description": "Constants and JSDoc typedefs shared by the Curbside client and server",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  }
+}

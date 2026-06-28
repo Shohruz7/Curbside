@@ -1,0 +1,11 @@
+# Shared by both image builds (build context is the repo root).
+# Keep build context small and never copy local installs or secrets into images.
+**/node_modules
+**/dist
+**/build
+**/.env
+**/*.log
+.git
+.gitignore
+.DS_Store
+Documentation

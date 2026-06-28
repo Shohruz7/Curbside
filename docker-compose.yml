@@ -10,17 +10,24 @@ services:
       - mongoData:/data/db
 
   server:
-    build: ./Backend
+    # Build from the repo root so the shared/ package (file:../shared) is in context.
+    build:
+      context: .
+      dockerfile: Backend/Dockerfile
     ports:
       - "4000:4000"
     environment:
       - MONGO_URI=mongodb://mongo:27017/curbside
-      - JWT_SECRET=change_me
+      # Required: set JWT_SECRET in a repo-root .env (see .env.example). Compose
+      # fails fast with this message if it is missing, so we never ship a default.
+      - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in repo-root .env}
     depends_on:
       - mongo
 
   client:
-    build: ./Frontend
+    build:
+      context: .
+      dockerfile: Frontend/Dockerfile
     ports:
       - "5173:5173"
     depends_on:
