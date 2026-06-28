@@ -60,6 +60,49 @@ cp .env.example .env   # then edit JWT_SECRET
 docker compose up
 ```
 
+## Environment Variables
+
+Every service reads its config from a local `.env` file. Copy the matching
+`.env.example`, fill in the values, and you're set — real `.env` files are
+gitignored and never committed.
+
+```
+cp .env.example .env                    # repo root (used by docker compose)
+cp Backend/.env.example Backend/.env     # API
+cp Frontend/.env.example Frontend/.env   # client
+```
+
+| File | Key | Required | Description |
+| --- | --- | --- | --- |
+| `Backend/.env` | `PORT` | no (default `4000`) | Port the API listens on. |
+| `Backend/.env` | `MONGO_URI` | yes | MongoDB connection string, e.g. `mongodb://localhost:27017/curbside`. |
+| `Backend/.env` | `JWT_SECRET` | yes | Secret used to sign and verify JWTs. Use a long random string. |
+| `Frontend/.env` | `VITE_API_URL` | no (default `http://localhost:4000/api`) | Base URL the client calls. |
+| `Frontend/.env` | `VITE_CLOUDINARY_CLOUD_NAME` | yes (for image upload) | Your Cloudinary cloud name. |
+| `Frontend/.env` | `VITE_CLOUDINARY_UPLOAD_PRESET` | yes (for image upload) | An **unsigned** upload preset (Cloudinary → Settings → Upload). |
+| `.env` (root) | `JWT_SECRET` | yes (Docker) | Passed to the API container by `docker compose`; it refuses to start without it. |
+
+Notes:
+- Images upload **directly from the browser to Cloudinary** using the unsigned
+  preset, so the cloud name and preset are public values (not secrets) and live
+  on the frontend. The backend needs no Cloudinary credentials.
+- Only `VITE_*` variables are exposed to the browser; for the Dockerized client
+  they are baked in at build time, so pass them as build args if you need
+  non-default values.
+
+## Local Development (without Docker)
+
+```
+# 1. Start MongoDB (local mongod, or just the compose service)
+docker compose up -d mongo
+
+# 2. API
+cd Backend && cp .env.example .env && npm install && npm run dev
+
+# 3. Client (in a new terminal)
+cd Frontend && cp .env.example .env && npm install && npm run dev
+```
+
 ## Tech Stack
 
 - **Frontend:** React, Tailwind CSS, React Router, Leaflet

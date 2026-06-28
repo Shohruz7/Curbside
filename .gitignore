@@ -2,7 +2,10 @@
 node_modules/
 
 # env files (never commit secrets)
+# matches .env in any folder (root, Backend/, Frontend/); .env.example is kept
 .env
+.env.local
+.env.*.local
 
 # build output
 dist/
