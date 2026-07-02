@@ -1,26 +1,29 @@
-// Leaflet map showing nearby items as markers.
-// Uses react-leaflet. Takes an `items` array as a prop.
-
+import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 
-// default map center -> roughly NYC (used if geolocation is denied)
-const defaultCenter = [40.7128, -74.006];
-
-export default function MapView({ items = [] }) {
+export default function MapView({ items = [], center = [40.7128, -74.006] }) {
   return (
-    <MapContainer center={defaultCenter} zoom={13} style={{ height: "400px" }}>
-      {/* the actual map tiles (OpenStreetMap is free) */}
+    <MapContainer
+      center={center}
+      zoom={13}
+      className="h-[400px] w-full rounded border"
+    >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-      {/* drop a marker for each item */}
       {items.map((item) => {
-        // remember: coordinates are stored [lng, lat], Leaflet wants [lat, lng]
-        const lng = item.location.coordinates[0];
-        const lat = item.location.coordinates[1];
+        if (!item.location?.coordinates) return null;
+
+        const [lng, lat] = item.location.coordinates;
 
         return (
-          <Marker key={item._id} position={[lat, lng]}>
-            <Popup>{item.title}</Popup>
+          <Marker key={item.id} position={[lat, lng]}>
+            <Popup>
+              <div>
+                <strong>{item.title}</strong>
+                <p>{item.category}</p>
+                <p>Status: {item.status}</p>
+              </div>
+            </Popup>
           </Marker>
         );
       })}
