@@ -1,14 +1,24 @@
-// Tiny helper for talking to the API.
-// Keeps the fetch boilerplate in one place so the pages stay short.
-
 const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 
-// grabs the saved JWT (set this at login time)
-function getToken() {
+export function getToken() {
   return localStorage.getItem("token");
 }
 
-// generic request -> path like "/items", options like { method, body }
+export function getSavedUser() {
+  const saved = localStorage.getItem("user");
+  return saved ? JSON.parse(saved) : null;
+}
+
+export function saveAuth(token, user) {
+  localStorage.setItem("token", token);
+  localStorage.setItem("user", JSON.stringify(user));
+}
+
+export function logout() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+}
+
 export async function apiRequest(path, options = {}) {
   const token = getToken();
 
@@ -16,12 +26,16 @@ export async function apiRequest(path, options = {}) {
     method: options.method || "GET",
     headers: {
       "Content-Type": "application/json",
-      // attach the token if we have one
       ...(token ? { Authorization: "Bearer " + token } : {})
     },
     body: options.body ? JSON.stringify(options.body) : undefined
   });
 
-  // TODO: handle 401 by clearing the token and sending the user to /login
-  return response.json();
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Something went wrong");
+  }
+
+  return data;
 }
