@@ -7,6 +7,8 @@ import Home from "./pages/Home.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import NewPost from "./pages/NewPost.jsx";
+import ItemDetail from "./pages/ItemDetail.jsx";
+import MyPosts from "./pages/MyPosts.jsx";
 
 export default function App() {
   return (
@@ -19,7 +21,8 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/new" element={<NewPost />} />
-        {/* TODO: maybe an item detail page at /items/:id */}
+        <Route path="/items/:id" element={<ItemDetail />} />
+        <Route path="/my-posts" element={<MyPosts />} />
       </Routes>
     </div>
   );
