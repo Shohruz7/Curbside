@@ -34,6 +34,17 @@ export async function apiRequest(path, options = {}) {
   const data = await response.json();
 
   if (!response.ok) {
+    // An expired/invalid token means a request we *sent* with a token was
+    // rejected. Clear the stale credentials and send the user to login.
+    // The `token` guard keeps wrong-password logins (sent without a token)
+    // from triggering a redirect loop — they just surface the error message.
+    if (response.status === 401 && token) {
+      logout();
+      if (window.location.pathname !== "/login") {
+        window.location.assign("/login");
+      }
+    }
+
     throw new Error(data.error || "Something went wrong");
   }
 
