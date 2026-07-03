@@ -6,6 +6,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 import { connectDb } from "./db.js";
+import { startReservationReleaser } from "./jobs/releaseReservations.js";
 import authRoutes from "./routes/auth.js";
 import itemRoutes from "./routes/items.js";
 import userRoutes from "./routes/users.js";
@@ -31,6 +32,9 @@ app.use("/api/users", userRoutes);
 
 // connect to mongo, then start listening
 connectDb().then(() => {
+  // Background sweep that returns expired reservations to available.
+  startReservationReleaser();
+
   app.listen(portNumber, () => {
     console.log("Curbside API running on port " + portNumber);
   });

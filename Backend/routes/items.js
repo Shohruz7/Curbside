@@ -7,6 +7,7 @@ import mongoose from "mongoose";
 
 import Item from "../models/Item.js";
 import { requireAuth } from "../middleware/auth.js";
+import { itemPopulate, itemResponse } from "../lib/itemFormat.js";
 
 import {
   ITEM_STATUS,
@@ -22,59 +23,12 @@ import {
 
 const router = express.Router();
 
-const itemPopulate = [
-  { path: "postedBy", select: "username email" },
-  { path: "reservedBy", select: "username email" },
-];
-
 /**
  * Checks whether a MongoDB id is valid before passing it to Mongoose.
  * This prevents ugly CastError responses for bad ids.
  */
 function isValidId(id) {
   return mongoose.Types.ObjectId.isValid(id);
-}
-
-/**
- * Converts a populated user, ObjectId, or missing value into a safe API response.
- */
-function userRefResponse(userRef) {
-  if (!userRef) return null;
-
-  // If populated, userRef is an object with _id, username, email.
-  if (userRef._id) {
-    return {
-      id: userRef._id.toString(),
-      username: userRef.username,
-      email: userRef.email,
-    };
-  }
-
-  // If not populated, userRef is probably just an ObjectId.
-  return userRef.toString();
-}
-
-/**
- * Formats an Item document before sending it to the client.
- * This gives the frontend a predictable id field instead of only _id.
- */
-function itemResponse(item) {
-  const obj = item.toObject ? item.toObject() : item;
-
-  return {
-    id: obj._id.toString(),
-    title: obj.title,
-    description: obj.description,
-    photoUrl: obj.photoUrl,
-    category: obj.category,
-    location: obj.location,
-    status: obj.status,
-    postedBy: userRefResponse(obj.postedBy),
-    reservedBy: userRefResponse(obj.reservedBy),
-    reservedUntil: obj.reservedUntil,
-    createdAt: obj.createdAt,
-    expiresAt: obj.expiresAt,
-  };
 }
 
 /**
