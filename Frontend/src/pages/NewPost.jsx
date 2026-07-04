@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { CATEGORIES } from "@curbside/shared";
 
 import { apiRequest, getToken } from "../api/client.js";
+import { uploadImage, isCloudinaryConfigured } from "../api/cloudinary.js";
 
 const defaultLocation = {
   lat: 40.7128,
@@ -16,6 +17,7 @@ export default function NewPost() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [photoUrl, setPhotoUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [lat, setLat] = useState(defaultLocation.lat);
   const [lng, setLng] = useState(defaultLocation.lng);
 
@@ -38,6 +40,24 @@ export default function NewPost() {
         setError("Could not get your location. Using NYC default location.");
       }
     );
+  }
+
+  async function handlePhotoChange(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    setError("");
+    setUploading(true);
+
+    try {
+      const url = await uploadImage(file);
+      setPhotoUrl(url);
+    } catch (err) {
+      setError(err.message);
+      event.target.value = ""; // let the user pick the same file again
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function handleSubmit(event) {
@@ -115,12 +135,38 @@ export default function NewPost() {
               ))}
             </select>
 
-            <input
-              className="w-full rounded-2xl border px-4 py-3"
-              placeholder="Photo URL"
-              value={photoUrl}
-              onChange={(e) => setPhotoUrl(e.target.value)}
-            />
+            {isCloudinaryConfigured ? (
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Photo
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="w-full rounded-2xl border px-4 py-3 file:mr-4 file:rounded-full file:border-0 file:bg-green-50 file:px-4 file:py-2 file:font-semibold file:text-green-700"
+                />
+                {uploading && (
+                  <p className="mt-2 text-sm text-gray-600">Uploading photo…</p>
+                )}
+                {photoUrl && !uploading && (
+                  <img
+                    src={photoUrl}
+                    alt="Preview of your item"
+                    className="mt-3 h-40 w-full rounded-2xl object-cover"
+                  />
+                )}
+              </div>
+            ) : (
+              // Fallback when Cloudinary env vars are not set, so the app
+              // still works on machines without upload credentials.
+              <input
+                className="w-full rounded-2xl border px-4 py-3"
+                placeholder="Photo URL"
+                value={photoUrl}
+                onChange={(e) => setPhotoUrl(e.target.value)}
+              />
+            )}
           </div>
         </section>
 
@@ -156,9 +202,10 @@ export default function NewPost() {
 
           <button
             type="submit"
-            className="mt-3 w-full rounded-full bg-green-700 px-5 py-3 font-semibold text-white hover:bg-green-800"
+            disabled={uploading}
+            className="mt-3 w-full rounded-full bg-green-700 px-5 py-3 font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Publish item
+            {uploading ? "Waiting for photo…" : "Publish item"}
           </button>
         </aside>
       </form>
