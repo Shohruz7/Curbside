@@ -3,11 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { CATEGORIES } from "@curbside/shared";
 
 import { apiRequest, getToken } from "../api/client.js";
-
-const defaultLocation = {
-  lat: 40.7128,
-  lng: -74.006,
-};
+import { uploadImage, isCloudinaryConfigured } from "../api/cloudinary.js";
 
 export default function NewPost() {
   const navigate = useNavigate();
@@ -16,28 +12,29 @@ export default function NewPost() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [photoUrl, setPhotoUrl] = useState("");
-  const [lat, setLat] = useState(defaultLocation.lat);
-  const [lng, setLng] = useState(defaultLocation.lng);
+  const [address, setAddress] = useState("");
 
+  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  function useMyLocation() {
-    if (!navigator.geolocation) {
-      setError("Geolocation is not supported in this browser.");
-      return;
-    }
+  async function handlePhotoChange(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLat(position.coords.latitude);
-        setLng(position.coords.longitude);
-        setError("");
-      },
-      () => {
-        setError("Could not get your location. Using NYC default location.");
-      }
-    );
+    setError("");
+    setUploading(true);
+
+    try {
+      const url = await uploadImage(file);
+      setPhotoUrl(url);
+    } catch (err) {
+      setError(err.message);
+      event.target.value = ""; // let the user pick the same file again
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function handleSubmit(event) {
@@ -50,23 +47,20 @@ export default function NewPost() {
       return;
     }
 
+    setSubmitting(true);
     try {
+      // The server geocodes the address (adds ~1s). Any geocoding failure
+      // ("Could not find that address", NYC only) surfaces here as err.message.
       await apiRequest("/items", {
         method: "POST",
-        body: {
-          title,
-          description,
-          category,
-          photoUrl,
-          lat: Number(lat),
-          lng: Number(lng)
-        }
+        body: { title, description, category, photoUrl, address }
       });
 
       setSuccess("Item posted successfully!");
       setTimeout(() => navigate("/"), 900);
     } catch (err) {
       setError(err.message);
+      setSubmitting(false);
     }
   }
 
@@ -78,8 +72,8 @@ export default function NewPost() {
         </p>
         <h1 className="text-4xl font-black">Post a curbside item</h1>
         <p className="mt-2 max-w-2xl text-gray-600">
-          Add a title, category, location, and optional photo URL so nearby users
-          can find your giveaway.
+          Add a title, category, pickup address, and an optional photo so nearby
+          users can find your giveaway.
         </p>
       </div>
 
@@ -115,50 +109,61 @@ export default function NewPost() {
               ))}
             </select>
 
-            <input
-              className="w-full rounded-2xl border px-4 py-3"
-              placeholder="Photo URL"
-              value={photoUrl}
-              onChange={(e) => setPhotoUrl(e.target.value)}
-            />
+            {isCloudinaryConfigured ? (
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Photo
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="w-full rounded-2xl border px-4 py-3 file:mr-4 file:rounded-full file:border-0 file:bg-green-50 file:px-4 file:py-2 file:font-semibold file:text-green-700"
+                />
+                {uploading && (
+                  <p className="mt-2 text-sm text-gray-600">Uploading photo…</p>
+                )}
+                {photoUrl && !uploading && (
+                  <img
+                    src={photoUrl}
+                    alt="Preview of your item"
+                    className="mt-3 h-40 w-full rounded-2xl object-cover"
+                  />
+                )}
+              </div>
+            ) : (
+              // Fallback when Cloudinary env vars are not set, so the app
+              // still works on machines without upload credentials.
+              <input
+                className="w-full rounded-2xl border px-4 py-3"
+                placeholder="Photo URL"
+                value={photoUrl}
+                onChange={(e) => setPhotoUrl(e.target.value)}
+              />
+            )}
           </div>
         </section>
 
         <aside className="rounded-3xl border bg-white p-6 shadow-sm">
           <h2 className="text-xl font-bold">Pickup location</h2>
           <p className="mt-1 text-sm text-gray-600">
-            Use your location or manually enter NYC coordinates.
+            Enter the pickup street address. It stays private — nearby users only
+            see the neighborhood until they reserve. Posting is limited to NYC.
           </p>
 
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <input
-              className="rounded-2xl border px-4 py-3"
-              placeholder="Latitude"
-              value={lat}
-              onChange={(e) => setLat(e.target.value)}
-            />
-
-            <input
-              className="rounded-2xl border px-4 py-3"
-              placeholder="Longitude"
-              value={lng}
-              onChange={(e) => setLng(e.target.value)}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={useMyLocation}
-            className="mt-4 w-full rounded-full border px-5 py-3 font-semibold hover:bg-gray-50"
-          >
-            Use my location
-          </button>
+          <input
+            className="mt-5 w-full rounded-2xl border px-4 py-3"
+            placeholder="123 Main St, Brooklyn, NY"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+          />
 
           <button
             type="submit"
-            className="mt-3 w-full rounded-full bg-green-700 px-5 py-3 font-semibold text-white hover:bg-green-800"
+            disabled={submitting || uploading}
+            className="mt-6 w-full rounded-full bg-green-700 px-5 py-3 font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Publish item
+            {submitting ? "Publishing…" : "Publish item"}
           </button>
         </aside>
       </form>
