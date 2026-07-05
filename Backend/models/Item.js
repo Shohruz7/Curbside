@@ -25,6 +25,13 @@ const itemSchema = new mongoose.Schema({
     }
   },
 
+  // Exact street address of the pickup spot. PRIVATE: only the owner and the
+  // current reserver ever see this (see lib/itemFormat.js). The public gets the
+  // coarse neighborhood/borough + an approximate map pin instead.
+  address: { type: String },
+  neighborhood: { type: String }, // public, coarse
+  borough: { type: String }, // public, coarse
+
   status: {
     type: String,
     enum: Object.values(ITEM_STATUS),

@@ -67,7 +67,8 @@ export const VALIDATION = {
   username: { min: 3, max: 30 },
   password: { min: 8 },
   title: { max: 100 },
-  description: { max: 1000 }
+  description: { max: 1000 },
+  address: { max: 200 }
 };
 
 // Stable error codes the API returns and the client can switch on. Keeping the

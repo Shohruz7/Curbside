@@ -6,8 +6,9 @@ import express from "express";
 import mongoose from "mongoose";
 
 import Item from "../models/Item.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { itemPopulate, itemResponse } from "../lib/itemFormat.js";
+import { geocodeAddress } from "../lib/geocode.js";
 
 import {
   ITEM_STATUS,
@@ -31,49 +32,59 @@ function isValidId(id) {
   return mongoose.Types.ObjectId.isValid(id);
 }
 
-/**
- * Reads location from the request body.
- * Supports both:
- *   { location: { coordinates: [lng, lat] } }
- * and:
- *   { lng: -73.9857, lat: 40.7484 }
- */
-function readCoordinatesFromBody(body) {
-  if (Array.isArray(body?.location?.coordinates)) {
-    return [
-      Number(body.location.coordinates[0]),
-      Number(body.location.coordinates[1]),
-    ];
-  }
-
-  if (Array.isArray(body?.coordinates)) {
-    return [Number(body.coordinates[0]), Number(body.coordinates[1])];
-  }
-
-  if (body.lng !== undefined && body.lat !== undefined) {
-    return [Number(body.lng), Number(body.lat)];
-  }
-
-  return null;
-}
+// Sentinel error used by resolveAddress so the route can map geocoder trouble
+// to a 502 (temporary) instead of a 400 (bad input) or a generic 500.
+class GeocodeUnavailableError extends Error {}
 
 /**
- * Validates that coordinates are a real [lng, lat] pair inside the NYC service area.
+ * Turns a free-text address from the request body into the location fields we
+ * store: { address, neighborhood, borough, coordinates }.
+ *
+ * Throws with a `.status` so the caller can just forward it:
+ *   400 - address missing / too long / not found / outside NYC
+ *   502 - geocoding service failed (network/HTTP/timeout)
  */
-function validateCoordinates(coordinates) {
-  if (!coordinates) {
-    return "Location is required";
+async function resolveAddress(rawAddress) {
+  const address = String(rawAddress || "").trim();
+  const maxLen = VALIDATION?.address?.max ?? 200;
+
+  if (!address) {
+    const err = new Error("Address is required");
+    err.status = 400;
+    throw err;
+  }
+  if (address.length > maxLen) {
+    const err = new Error(`Address must be ${maxLen} characters or less`);
+    err.status = 400;
+    throw err;
   }
 
-  if (!isValidLngLat(coordinates)) {
-    return "Location coordinates must be a valid [lng, lat] pair";
+  let geo;
+  try {
+    geo = await geocodeAddress(address);
+  } catch (cause) {
+    console.error("Geocoding failed:", cause);
+    throw new GeocodeUnavailableError();
   }
 
-  if (!isWithinNyc(coordinates)) {
-    return "Location must be inside the NYC service area";
+  if (!geo || !isValidLngLat(geo.coordinates)) {
+    const err = new Error("Could not find that address");
+    err.status = 400;
+    throw err;
   }
 
-  return null;
+  if (!isWithinNyc(geo.coordinates)) {
+    const err = new Error("Location must be inside the NYC service area");
+    err.status = 400;
+    throw err;
+  }
+
+  return {
+    address,
+    neighborhood: geo.neighborhood,
+    borough: geo.borough,
+    coordinates: geo.coordinates,
+  };
 }
 
 /**
@@ -126,9 +137,11 @@ function validateItemFields(body, { partial = false } = {}) {
 }
 
 // GET /api/items
-// Public route.
+// Public route (optionalAuth: owner/reserver see exact address + coords).
 // Lists nearby items using lat, lng, radius, and optional status/category filters.
-router.get("/", async (req, res) => {
+// Search is NOT restricted to NYC -> visitors anywhere can browse the feed
+// (posting stays NYC-only, enforced at create time).
+router.get("/", optionalAuth, async (req, res) => {
   try {
     const lat = Number(req.query.lat);
     const lng = Number(req.query.lng);
@@ -146,12 +159,6 @@ router.get("/", async (req, res) => {
     if (!isValidLngLat(coordinates)) {
       return res.status(400).json({
         error: "lat and lng query parameters are required and must be valid numbers",
-      });
-    }
-
-    if (!isWithinNyc(coordinates)) {
-      return res.status(400).json({
-        error: "Search location must be inside the NYC service area",
       });
     }
 
@@ -204,7 +211,7 @@ router.get("/", async (req, res) => {
       .populate(itemPopulate);
 
     return res.json({
-      items: items.map(itemResponse),
+      items: items.map((item) => itemResponse(item, req.userId)),
     });
   } catch (err) {
     console.error("List items error:", err);
@@ -216,9 +223,9 @@ router.get("/", async (req, res) => {
 });
 
 // GET /api/items/:id
-// Public route.
+// Public route (optionalAuth: owner/reserver see exact address + coords).
 // Returns one item by id.
-router.get("/:id", async (req, res) => {
+router.get("/:id", optionalAuth, async (req, res) => {
   try {
     if (!isValidId(req.params.id)) {
       return res.status(400).json({
@@ -235,7 +242,7 @@ router.get("/:id", async (req, res) => {
     }
 
     return res.json({
-      item: itemResponse(item),
+      item: itemResponse(item, req.userId),
     });
   } catch (err) {
     console.error("Get item error:", err);
@@ -253,19 +260,17 @@ router.post("/", requireAuth, async (req, res) => {
   try {
     const errors = validateItemFields(req.body);
 
-    const coordinates = readCoordinatesFromBody(req.body);
-    const coordinateError = validateCoordinates(coordinates);
-
-    if (coordinateError) {
-      errors.push(coordinateError);
-    }
-
     if (errors.length > 0) {
       return res.status(400).json({
         error: errors[0],
         details: errors,
       });
     }
+
+    // Geocode the typed address into exact coords + coarse neighborhood/borough.
+    // resolveAddress throws with a .status (400 bad/outside-NYC) or a
+    // GeocodeUnavailableError (502) — never a generic 500 for address trouble.
+    const resolved = await resolveAddress(req.body.address);
 
     const title = String(req.body.title).trim();
     const description = String(req.body.description || "").trim();
@@ -277,9 +282,12 @@ router.post("/", requireAuth, async (req, res) => {
       description,
       photoUrl,
       category,
+      address: resolved.address,
+      neighborhood: resolved.neighborhood,
+      borough: resolved.borough,
       location: {
         type: "Point",
-        coordinates,
+        coordinates: resolved.coordinates,
       },
       postedBy: req.userId,
       expiresAt: new Date(Date.now() + POST_EXPIRY_MS),
@@ -288,9 +296,18 @@ router.post("/", requireAuth, async (req, res) => {
     await item.populate(itemPopulate);
 
     return res.status(201).json({
-      item: itemResponse(item),
+      item: itemResponse(item, req.userId),
     });
   } catch (err) {
+    if (err instanceof GeocodeUnavailableError) {
+      return res.status(502).json({
+        error: "Address lookup failed — please try again",
+      });
+    }
+    if (err.status === 400) {
+      return res.status(400).json({ error: err.message });
+    }
+
     console.error("Create item error:", err);
 
     return res.status(500).json({
@@ -326,30 +343,24 @@ router.patch("/:id", requireAuth, async (req, res) => {
 
     const errors = validateItemFields(req.body, { partial: true });
 
-    if (
-      req.body.location !== undefined ||
-      req.body.coordinates !== undefined ||
-      req.body.lat !== undefined ||
-      req.body.lng !== undefined
-    ) {
-      const coordinates = readCoordinatesFromBody(req.body);
-      const coordinateError = validateCoordinates(coordinates);
-
-      if (coordinateError) {
-        errors.push(coordinateError);
-      } else {
-        item.location = {
-          type: "Point",
-          coordinates,
-        };
-      }
-    }
-
     if (errors.length > 0) {
       return res.status(400).json({
         error: errors[0],
         details: errors,
       });
+    }
+
+    // If the address changed, re-geocode and update all location fields
+    // together so address / neighborhood / borough / coords never drift apart.
+    if (Object.prototype.hasOwnProperty.call(req.body, "address")) {
+      const resolved = await resolveAddress(req.body.address);
+      item.address = resolved.address;
+      item.neighborhood = resolved.neighborhood;
+      item.borough = resolved.borough;
+      item.location = {
+        type: "Point",
+        coordinates: resolved.coordinates,
+      };
     }
 
     if (Object.prototype.hasOwnProperty.call(req.body, "title")) {
@@ -375,9 +386,18 @@ router.patch("/:id", requireAuth, async (req, res) => {
     await item.populate(itemPopulate);
 
     return res.json({
-      item: itemResponse(item),
+      item: itemResponse(item, req.userId),
     });
   } catch (err) {
+    if (err instanceof GeocodeUnavailableError) {
+      return res.status(502).json({
+        error: "Address lookup failed — please try again",
+      });
+    }
+    if (err.status === 400) {
+      return res.status(400).json({ error: err.message });
+    }
+
     console.error("Edit item error:", err);
 
     return res.status(500).json({
@@ -483,7 +503,7 @@ router.post("/:id/reserve", requireAuth, async (req, res) => {
     }
 
     return res.json({
-      item: itemResponse(item),
+      item: itemResponse(item, req.userId),
     });
   } catch (err) {
     console.error("Reserve item error:", err);
@@ -544,7 +564,7 @@ router.delete("/:id/reserve", requireAuth, async (req, res) => {
     }
 
     return res.json({
-      item: itemResponse(item),
+      item: itemResponse(item, req.userId),
     });
   } catch (err) {
     console.error("Cancel reservation error:", err);
@@ -592,6 +612,9 @@ router.post("/:id/claim", requireAuth, async (req, res) => {
     }
 
     item.status = ITEM_STATUS.CLAIMED;
+    // Clearing reservedBy means the claim response no longer treats the former
+    // reserver as privileged, so it won't echo the exact address back. That's
+    // fine — they already saw it while the item was reserved to them.
     item.reservedBy = undefined;
     item.reservedUntil = undefined;
 
@@ -599,7 +622,7 @@ router.post("/:id/claim", requireAuth, async (req, res) => {
     await item.populate(itemPopulate);
 
     return res.json({
-      item: itemResponse(item),
+      item: itemResponse(item, req.userId),
     });
   } catch (err) {
     console.error("Claim item error:", err);
