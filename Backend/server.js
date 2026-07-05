@@ -17,7 +17,14 @@ const app = express();
 const portNumber = process.env.PORT || 4000;
 
 // middleware
-app.use(cors());
+// CORS defaults to open (any origin). In production set CORS_ORIGIN to a
+// comma-separated list of allowed origins (e.g.
+// "https://curbside.com,https://www.curbside.com") to lock the API to just your
+// frontend. Auth is a Bearer token, not cookies, so no credentials mode needed.
+const corsOrigin = process.env.CORS_ORIGIN;
+app.use(
+  cors(corsOrigin ? { origin: corsOrigin.split(",").map((s) => s.trim()) } : {})
+);
 app.use(express.json()); // lets us read JSON request bodies
 
 // quick health check so we know the server is alive

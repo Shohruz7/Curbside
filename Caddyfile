@@ -1,0 +1,28 @@
+# Reverse proxy + automatic HTTPS for Curbside (single VPS).
+# Caddy obtains and renews a Let's Encrypt certificate for DOMAIN automatically.
+# Set DOMAIN (and optionally ACME_EMAIL) in the VPS .env next to the prod compose.
+#
+# Everything is served from one origin:
+#   https://DOMAIN/api/*  -> Express API (server:4000)
+#   https://DOMAIN/*      -> React SPA   (client:5173, nginx)
+
+{
+	# Email is used by Let's Encrypt for expiry notices. Has a sane default so
+	# an unset ACME_EMAIL doesn't break the config.
+	email {$ACME_EMAIL:shohruzabd19@gmail.com}
+}
+
+{$DOMAIN} {
+	encode gzip
+
+	# API first: the Express routes already live under /api, so we pass the
+	# path through unchanged (no prefix stripping).
+	handle /api/* {
+		reverse_proxy server:4000
+	}
+
+	# Everything else is the single-page app.
+	handle {
+		reverse_proxy client:5173
+	}
+}

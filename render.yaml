@@ -1,0 +1,36 @@
+# Render Blueprint for the Curbside API.
+# Deploys the prebuilt Docker Hub image (build & push it from your dev machine:
+# `docker compose build && docker compose push server`). Render pulls it, injects
+# PORT, and puts HTTPS in front automatically.
+#
+# Set up: Render Dashboard > New > Blueprint > point at this repo. Then fill in
+# the `sync: false` env vars (secrets) in the dashboard.
+#
+# NOTE: the free instance type spins down after ~15 min idle and cold-starts on
+# the next request (~30s). While asleep, the reservation-release background job
+# is paused; it resumes on the next request. Use a paid instance to keep it
+# always-on.
+
+services:
+  - type: web
+    name: curbside-api
+    runtime: image
+    image:
+      url: docker.io/shohruz7/curbside-server:latest
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    envVars:
+      - key: MONGO_URI
+        sync: false # set in dashboard: mongodb+srv://...@cluster.mongodb.net/curbside
+      - key: JWT_SECRET
+        sync: false # set in dashboard: openssl rand -hex 32
+      # Public (not a secret) — allowed frontend origins. Add the Vercel
+      # *.vercel.app preview URL too if you test before the custom domain's DNS
+      # is live.
+      - key: CORS_ORIGIN
+        value: https://curbside.com,https://www.curbside.com
+      - key: NODE_ENV
+        value: production
+      - key: NOMINATIM_USER_AGENT
+        value: curbside-app/1.0 (contact shohruzabd19@gmail.com)

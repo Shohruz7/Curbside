@@ -1,0 +1,67 @@
+# Production stack for a single VPS.
+# Runs the prebuilt Docker Hub images (no local build) behind Caddy, which
+# terminates HTTPS and reverse-proxies to the API + client. MongoDB is EXTERNAL
+# (Atlas or a managed instance) via MONGO_URI — no mongo container here, so your
+# data does not live or die with this VPS.
+#
+# Only Caddy is exposed to the internet (:80 + :443). The API and client are
+# reachable only over the internal Docker network, by service name.
+#
+# On the VPS (see DEPLOY.md for the full runbook):
+#   1. Create a .env next to this file with DOMAIN, MONGO_URI, JWT_SECRET.
+#   2. Point a DNS A record for DOMAIN at this VPS, open ports 80 + 443.
+#   3. docker compose -f docker-compose.prod.yml pull
+#   4. docker compose -f docker-compose.prod.yml up -d
+#
+# NOTE: the client image bakes VITE_API_URL (= https://DOMAIN/api) at BUILD time,
+# so build & push it from your dev machine with that value set. Nothing
+# client-side is configured on the VPS.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:?set DOMAIN in .env}
+      - ACME_EMAIL=${ACME_EMAIL:-shohruzabd19@gmail.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Persist issued certs across restarts — without this, Caddy re-requests
+      # certificates every boot and can hit Let's Encrypt rate limits.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - server
+      - client
+
+  server:
+    image: shohruz7/curbside-server:latest
+    restart: unless-stopped
+    # Internal only — Caddy reaches this over the compose network at server:4000.
+    expose:
+      - "4000"
+    environment:
+      # Point at Atlas or your managed Mongo, e.g.
+      # mongodb+srv://user:pass@cluster.mongodb.net/curbside
+      - MONGO_URI=${MONGO_URI:?set MONGO_URI in .env}
+      - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in .env}
+      - NODE_ENV=production
+      # Nominatim policy requires a descriptive User-Agent with contact info.
+      # Quoted because the value contains spaces/parentheses.
+      - "NOMINATIM_USER_AGENT=${NOMINATIM_USER_AGENT:-curbside-app/1.0 (contact shohruzabd19@gmail.com)}"
+
+  client:
+    image: shohruz7/curbside-client:latest
+    restart: unless-stopped
+    # Internal only — Caddy reaches this over the compose network at client:5173.
+    expose:
+      - "5173"
+    depends_on:
+      - server
+
+volumes:
+  caddy_data:
+  caddy_config:
