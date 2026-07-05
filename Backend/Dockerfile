@@ -1,7 +1,11 @@
 # Dockerfile for the Curbside API
 # NOTE: build context is the repo root (see docker-compose.yml) so the shared/
 # package referenced via "file:../shared" is available during npm install.
-FROM node:20
+#
+# node:20-slim (Debian slim, glibc) keeps the image small while still letting
+# bcrypt's prebuilt native binary install without a compiler toolchain (glibc,
+# unlike alpine/musl, matches the prebuild).
+FROM node:20-slim
 
 WORKDIR /app
 
@@ -9,9 +13,9 @@ WORKDIR /app
 # /app) resolves correctly during install.
 COPY shared /shared
 
-# install deps first so Docker can cache this layer
+# install prod deps only (drops nodemon); cache this layer
 COPY Backend/package*.json ./
-RUN npm install
+RUN npm install --omit=dev
 
 COPY Backend/ ./
 

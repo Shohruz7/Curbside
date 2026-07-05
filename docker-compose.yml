@@ -10,6 +10,9 @@ services:
       - mongoData:/data/db
 
   server:
+    # image: is the Docker Hub tag `docker compose build` stamps and
+    # `docker compose push server` publishes.
+    image: shohruz7/curbside-server:latest
     # Build from the repo root so the shared/ package (file:../shared) is in context.
     build:
       context: .
@@ -25,9 +28,19 @@ services:
       - mongo
 
   client:
+    # image: is the Docker Hub tag. IMPORTANT: the VITE_* build args below are
+    # baked into this image at build time, so build/push it with PRODUCTION
+    # values set (see DEPLOY.md) — you cannot change them at run time.
+    image: shohruz7/curbside-client:latest
     build:
       context: .
       dockerfile: Frontend/Dockerfile
+      # Build-time only: Vite bakes VITE_* vars into the static bundle. Change
+      # these in the repo-root .env, then `docker compose build client`.
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:4000/api}
+        - VITE_CLOUDINARY_CLOUD_NAME=${VITE_CLOUDINARY_CLOUD_NAME:-}
+        - VITE_CLOUDINARY_UPLOAD_PRESET=${VITE_CLOUDINARY_UPLOAD_PRESET:-}
     ports:
       - "5173:5173"
     depends_on:
