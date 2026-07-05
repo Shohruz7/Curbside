@@ -65,6 +65,7 @@ export default function ItemDetail() {
   const coordinates = item.location?.coordinates;
   const center = coordinates ? [coordinates[1], coordinates[0]] : undefined;
   const postedAt = item.createdAt ? new Date(item.createdAt).toLocaleString() : null;
+  const locationLabel = [item.neighborhood, item.borough].filter(Boolean).join(", ");
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
@@ -81,6 +82,8 @@ export default function ItemDetail() {
 
           <div className="mt-4 space-y-1 text-sm text-gray-600">
             {item.postedBy?.username && <p>Posted by {item.postedBy.username}</p>}
+            {locationLabel && <p>📍 {locationLabel}</p>}
+            {item.address && <p className="font-medium text-gray-800">Pickup address: {item.address}</p>}
             {postedAt && <p>Posted {postedAt}</p>}
           </div>
 
@@ -91,13 +94,19 @@ export default function ItemDetail() {
           {center && (
             <div className="mt-6">
               <MapView items={[item]} center={center} />
+              {item.locationIsApproximate && (
+                <p className="mt-2 text-sm text-gray-500">
+                  Approximate location — the exact address is shown after you reserve.
+                </p>
+              )}
             </div>
           )}
         </section>
 
         <aside>
-          {/* Reuse ItemCard so reserve/cancel/claim behavior stays in one place. */}
-          <ItemCard item={item} />
+          {/* Reuse ItemCard so reserve/cancel/claim behavior stays in one place.
+              onUpdate keeps this page's item (and its map) in sync after actions. */}
+          <ItemCard item={item} onUpdate={setItem} />
         </aside>
       </div>
     </main>

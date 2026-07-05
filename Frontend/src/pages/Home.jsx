@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isWithinNyc } from "@curbside/shared";
 
 import MapView from "../components/MapView.jsx";
 import ItemCard from "../components/ItemCard.jsx";
@@ -14,6 +15,7 @@ export default function Home() {
   const [location, setLocation] = useState(defaultLocation);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [outsideNyc, setOutsideNyc] = useState(false);
 
   async function loadItems(lat, lng) {
     try {
@@ -39,11 +41,17 @@ export default function Home() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const userLocation = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
+        const { latitude, longitude } = position.coords;
 
+        // All listings are NYC-only. Visitors outside NYC can still browse, but
+        // we snap them to the NYC feed (and flag it) so they see real content.
+        if (!isWithinNyc([longitude, latitude])) {
+          setOutsideNyc(true);
+          loadItems(defaultLocation.lat, defaultLocation.lng);
+          return;
+        }
+
+        const userLocation = { lat: latitude, lng: longitude };
         setLocation(userLocation);
         loadItems(userLocation.lat, userLocation.lng);
       },
@@ -90,6 +98,12 @@ export default function Home() {
       </section>
 
       <section id="nearby" className="mx-auto max-w-6xl px-4 py-10">
+        {outsideNyc && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            You're browsing NYC listings — posting is limited to NYC.
+          </div>
+        )}
+
         <div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-green-700">
