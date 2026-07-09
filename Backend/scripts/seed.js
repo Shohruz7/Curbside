@@ -75,11 +75,34 @@ const LISTINGS = [
   { title: "Kids' bicycle", category: "toys", address: "7326 Amboy Rd, Staten Island, NY 10307", neighborhood: "Tottenville", borough: "Staten Island", coordinates: [-74.2460, 40.5100] },
   { title: "Blender + toaster", category: "kitchen", address: "200 New Dorp Ln, Staten Island, NY 10306", neighborhood: "New Dorp", borough: "Staten Island", coordinates: [-74.1160, 40.5730] },
   { title: "Men's clothing, size L", category: "clothing", address: "100 Bay St, Staten Island, NY 10301", neighborhood: "Stapleton", borough: "Staten Island", coordinates: [-74.0770, 40.6270] },
+
+  // --- South Brooklyn (7) ---
+  { title: "Beach chairs, set of 4", category: "furniture", address: "1000 Surf Ave, Brooklyn, NY 11224", neighborhood: "Coney Island", borough: "Brooklyn", coordinates: [-73.9790, 40.5755] },
+  { title: "Kids' scooter", category: "toys", address: "500 Ocean Pkwy, Brooklyn, NY 11218", neighborhood: "Parkville", borough: "Brooklyn", coordinates: [-73.9720, 40.6350] },
+  { title: "Fishing gear", category: "other", address: "2001 Emmons Ave, Brooklyn, NY 11235", neighborhood: "Sheepshead Bay", borough: "Brooklyn", coordinates: [-73.9430, 40.5865] },
+  { title: "Bar stools, pair", category: "furniture", address: "5000 5th Ave, Brooklyn, NY 11220", neighborhood: "Sunset Park", borough: "Brooklyn", coordinates: [-74.0080, 40.6440] },
+  { title: "Rice cooker", category: "kitchen", address: "2000 Church Ave, Brooklyn, NY 11226", neighborhood: "Flatbush", borough: "Brooklyn", coordinates: [-73.9600, 40.6500] },
+  { title: "Vinyl records lot", category: "electronics", address: "150 Franklin St, Brooklyn, NY 11222", neighborhood: "Greenpoint", borough: "Brooklyn", coordinates: [-73.9580, 40.7300] },
+  { title: "Kids' winter boots", category: "clothing", address: "2000 86th St, Brooklyn, NY 11214", neighborhood: "Bensonhurst", borough: "Brooklyn", coordinates: [-73.9930, 40.5990] },
+
+  // --- More Queens (3) ---
+  { title: "Office chair", category: "furniture", address: "43-01 Queens Blvd, Sunnyside, NY 11104", neighborhood: "Sunnyside", borough: "Queens", coordinates: [-73.9230, 40.7440] },
+  { title: "Novels, box of 20", category: "books", address: "60-01 Myrtle Ave, Ridgewood, NY 11385", neighborhood: "Ridgewood", borough: "Queens", coordinates: [-73.9020, 40.7000] },
+  { title: "Surfboard", category: "other", address: "9200 Rockaway Beach Blvd, Queens, NY 11693", neighborhood: "Rockaway Beach", borough: "Queens", coordinates: [-73.8100, 40.5850] },
+
+  // --- More Manhattan (3) ---
+  { title: "Standing mirror", category: "furniture", address: "1200 Madison Ave, New York, NY 10128", neighborhood: "Upper East Side", borough: "Manhattan", coordinates: [-73.9550, 40.7830] },
+  { title: "Toaster oven", category: "kitchen", address: "2100 3rd Ave, New York, NY 10035", neighborhood: "East Harlem", borough: "Manhattan", coordinates: [-73.9350, 40.7970] },
+  { title: "Monitor stand", category: "electronics", address: "40 Wall St, New York, NY 10005", neighborhood: "Financial District", borough: "Manhattan", coordinates: [-74.0090, 40.7075] },
+
+  // --- More Bronx + Staten Island (2) ---
+  { title: "Crib and mattress", category: "furniture", address: "300 E 138th St, Bronx, NY 10454", neighborhood: "Mott Haven", borough: "Bronx", coordinates: [-73.9250, 40.8080] },
+  { title: "Board games bundle", category: "toys", address: "1000 Castleton Ave, Staten Island, NY 10310", neighborhood: "West Brighton", borough: "Staten Island", coordinates: [-74.1140, 40.6320] },
 ];
 
 // Which listing indices are reserved / claimed (rest are available).
-const RESERVED_INDEXES = new Set([3, 9, 15, 21, 27]);
-const CLAIMED_INDEXES = new Set([6, 18, 24]);
+const RESERVED_INDEXES = new Set([3, 9, 15, 21, 27, 33, 39]);
+const CLAIMED_INDEXES = new Set([6, 18, 24, 42]);
 
 async function seed() {
   await connectDb();
