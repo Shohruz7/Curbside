@@ -1,8 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+
+import { apiRequest, getToken, getSavedUser } from "../api/client.js";
 
 // Pin color per status, matching the card status badges.
 const STATUS_COLOR = {
@@ -43,8 +45,91 @@ function FitToMarkers({ points }) {
   return null;
 }
 
+// Popup body with a Reserve action, so users can reserve straight from the map.
+function MapItemPopup({ item, onUpdate }) {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const user = getSavedUser();
+  const isOwner = user && item.postedBy?.id === user.id;
+  const place = [item.neighborhood, item.borough].filter(Boolean).join(", ");
+
+  async function reserve() {
+    setError("");
+    if (!getToken()) {
+      setError("Log in to reserve this item.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await apiRequest(`/items/${item.id}/reserve`, { method: "POST" });
+      onUpdate(res.item); // updates the pin color + this popup
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Popup minWidth={210}>
+      {/* Fixed width so Leaflet sizes the popup correctly and the image
+          actually renders (percentage widths race the popup's own sizing). */}
+      <div className="w-[200px]">
+        {item.photoUrl && (
+          <img
+            src={item.photoUrl}
+            alt=""
+            className="mb-2 h-28 w-[200px] rounded-lg object-cover"
+          />
+        )}
+
+        <Link
+          to={`/items/${item.id}`}
+          className="block font-bold text-green-700 hover:underline"
+        >
+          {item.title}
+        </Link>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+          {item.category || "other"}
+        </p>
+        {place && <p className="text-sm text-gray-600">📍 {place}</p>}
+
+        {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+
+        {item.status === "available" && !isOwner && (
+          <button
+            onClick={reserve}
+            disabled={busy}
+            className="mt-2 w-full rounded-full bg-green-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {busy ? "Reserving…" : "Reserve item"}
+          </button>
+        )}
+        {item.status === "available" && isOwner && (
+          <p className="mt-2 text-xs text-gray-500">This is your post.</p>
+        )}
+        {item.status === "reserved" && (
+          <p className="mt-2 text-xs font-medium text-amber-700">Reserved</p>
+        )}
+        {item.status === "claimed" && (
+          <p className="mt-2 text-xs text-gray-500">Picked up.</p>
+        )}
+      </div>
+    </Popup>
+  );
+}
+
 export default function MapView({ items = [], center = [40.7128, -74.006] }) {
-  const points = items
+  // Local overrides let a reserve action update the pin + popup in place
+  // without the parent having to refetch.
+  const [overrides, setOverrides] = useState({});
+  const merged = items.map((i) => overrides[i.id] || i);
+  const handleUpdate = (it) => setOverrides((o) => ({ ...o, [it.id]: it }));
+
+  // Fit uses the original items so reserving (which can reveal exact coords)
+  // doesn't re-pan the map.
+  const basePoints = items
     .filter((i) => i.location?.coordinates)
     .map((i) => {
       const [lng, lat] = i.location.coordinates;
@@ -66,40 +151,20 @@ export default function MapView({ items = [], center = [40.7128, -74.006] }) {
           subdomains="abcd"
         />
 
-        <FitToMarkers points={points} />
+        <FitToMarkers points={basePoints} />
 
-        {items.map((item) => {
+        {merged.map((item) => {
           if (!item.location?.coordinates) return null;
 
           const [lng, lat] = item.location.coordinates;
-          const place = [item.neighborhood, item.borough].filter(Boolean).join(", ");
 
           return (
-            <Marker key={item.id} position={[lat, lng]} icon={pinIcon(item.status)}>
-              <Popup>
-                <div className="min-w-[170px]">
-                  {item.photoUrl && (
-                    <img
-                      src={item.photoUrl}
-                      alt=""
-                      className="mb-2 h-20 w-full rounded object-cover"
-                    />
-                  )}
-                  <Link
-                    to={`/items/${item.id}`}
-                    className="font-bold text-green-700 hover:underline"
-                  >
-                    {item.title}
-                  </Link>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    {item.category || "other"}
-                  </p>
-                  {place && <p className="text-sm text-gray-600">📍 {place}</p>}
-                  <p className="text-sm capitalize text-gray-600">
-                    Status: {item.status}
-                  </p>
-                </div>
-              </Popup>
+            <Marker
+              key={item.id}
+              position={[lat, lng]}
+              icon={pinIcon(item.status)}
+            >
+              <MapItemPopup item={item} onUpdate={handleUpdate} />
             </Marker>
           );
         })}
