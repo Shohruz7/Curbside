@@ -151,7 +151,7 @@ export default function MapView({ items = [], center = [40.7128, -74.006] }) {
     });
 
   return (
-    <div className="h-[420px] overflow-hidden rounded-3xl border bg-white shadow-sm">
+    <div className="isolate h-[420px] overflow-hidden rounded-3xl border bg-white shadow-sm">
       <MapContainer
         center={center}
         zoom={12}
