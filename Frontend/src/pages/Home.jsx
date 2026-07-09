@@ -10,19 +10,26 @@ const defaultLocation = {
   lng: -74.006,
 };
 
+// Wide radius so items across the city show up, not just the immediate block.
+// 20km is the API's max and covers most of NYC from any center.
+const SEARCH_RADIUS_M = 20000;
+
 export default function Home() {
   const [itemList, setItemList] = useState([]);
   const [location, setLocation] = useState(defaultLocation);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [outsideNyc, setOutsideNyc] = useState(false);
+  const [query, setQuery] = useState("");
 
   async function loadItems(lat, lng) {
     try {
       setLoading(true);
       setError("");
 
-      const data = await apiRequest(`/items?lat=${lat}&lng=${lng}&radius=5000`);
+      const data = await apiRequest(
+        `/items?lat=${lat}&lng=${lng}&radius=${SEARCH_RADIUS_M}&limit=100`
+      );
 
       setItemList(Array.isArray(data.items) ? data.items : []);
     } catch (err) {
@@ -61,6 +68,17 @@ export default function Home() {
     );
   }, []);
 
+  // Client-side search over the loaded feed: title, description, category,
+  // neighborhood, borough. Filters both the map pins and the grid.
+  const q = query.trim().toLowerCase();
+  const visibleItems = q
+    ? itemList.filter((it) =>
+        [it.title, it.description, it.category, it.neighborhood, it.borough]
+          .filter(Boolean)
+          .some((field) => field.toLowerCase().includes(q))
+      )
+    : itemList;
+
   return (
     <main>
       <section className="bg-gradient-to-br from-green-50 via-white to-stone-100">
@@ -93,7 +111,7 @@ export default function Home() {
             </div>
           </div>
 
-          <MapView items={itemList} center={[location.lat, location.lng]} />
+          <MapView items={visibleItems} center={[location.lat, location.lng]} />
         </div>
       </section>
 
@@ -112,12 +130,21 @@ export default function Home() {
             <h2 className="text-3xl font-black">Nearby items</h2>
           </div>
 
-          <button
-            onClick={() => loadItems(location.lat, location.lng)}
-            className="rounded-full border bg-white px-5 py-2 text-sm font-semibold hover:bg-gray-50"
-          >
-            Refresh
-          </button>
+          <div className="flex gap-2">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search title, category, or neighborhood"
+              className="w-full rounded-full border px-4 py-2 text-sm sm:w-72"
+            />
+            <button
+              onClick={() => loadItems(location.lat, location.lng)}
+              className="rounded-full border bg-white px-5 py-2 text-sm font-semibold hover:bg-gray-50"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
 
         {loading && (
@@ -141,8 +168,15 @@ export default function Home() {
           </div>
         )}
 
+        {!loading && !error && itemList.length > 0 && visibleItems.length === 0 && (
+          <div className="rounded-3xl border bg-white p-10 text-center shadow-sm">
+            <h3 className="text-xl font-bold">No matches for “{query}”</h3>
+            <p className="mt-2 text-gray-600">Try a different word, or clear the search.</p>
+          </div>
+        )}
+
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {itemList.map((item) => (
+          {visibleItems.map((item) => (
             <ItemCard key={item.id} item={item} />
           ))}
         </div>
