@@ -16,3 +16,6 @@ build/
 
 # os junk
 .DS_Store
+
+# local only deploy notes
+DEPLOY.md
