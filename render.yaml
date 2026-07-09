@@ -1,10 +1,10 @@
 # Render Blueprint for the Curbside API.
-# Deploys the prebuilt Docker Hub image (build & push it from your dev machine:
-# `docker compose build && docker compose push server`). Render pulls it, injects
-# PORT, and puts HTTPS in front automatically.
+# Render builds the Docker image from this repo on its own amd64 machines (no
+# Docker Hub push needed), injects PORT, and puts HTTPS in front automatically.
 #
 # Set up: Render Dashboard > New > Blueprint > point at this repo. Then fill in
-# the `sync: false` env vars (secrets) in the dashboard.
+# the `sync: false` env vars (secrets) in the dashboard. Pushing to the repo
+# triggers a rebuild and deploy.
 #
 # NOTE: the free instance type spins down after ~15 min idle and cold-starts on
 # the next request (~30s). While asleep, the reservation-release background job
@@ -14,9 +14,11 @@
 services:
   - type: web
     name: curbside-api
-    runtime: image
-    image:
-      url: docker.io/shohruz7/curbside-server:latest
+    runtime: docker
+    dockerfilePath: ./Backend/Dockerfile
+    # Build context is the repo root so `COPY shared /shared` in the Dockerfile
+    # can see the shared/ package.
+    dockerContext: .
     plan: free
     region: oregon
     healthCheckPath: /api/health
