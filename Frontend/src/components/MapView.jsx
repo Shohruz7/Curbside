@@ -52,24 +52,29 @@ function MapItemPopup({ item, onUpdate }) {
 
   const user = getSavedUser();
   const isOwner = user && item.postedBy?.id === user.id;
+  const isReserver = user && item.reservedBy?.id === user.id;
   const place = [item.neighborhood, item.borough].filter(Boolean).join(", ");
 
-  async function reserve() {
+  // Reserve (POST) and unreserve (DELETE) both hit /reserve and swap in the
+  // updated item, which recolors the pin and re-renders this popup.
+  async function runAction(method) {
     setError("");
     if (!getToken()) {
-      setError("Log in to reserve this item.");
+      setError("Log in to manage this item.");
       return;
     }
     setBusy(true);
     try {
-      const res = await apiRequest(`/items/${item.id}/reserve`, { method: "POST" });
-      onUpdate(res.item); // updates the pin color + this popup
+      const res = await apiRequest(`/items/${item.id}/reserve`, { method });
+      onUpdate(res.item);
     } catch (err) {
       setError(err.message);
     } finally {
       setBusy(false);
     }
   }
+  const reserve = () => runAction("POST");
+  const unreserve = () => runAction("DELETE");
 
   return (
     <Popup minWidth={210}>
@@ -109,7 +114,16 @@ function MapItemPopup({ item, onUpdate }) {
         {item.status === "available" && isOwner && (
           <p className="mt-2 text-xs text-gray-500">This is your post.</p>
         )}
-        {item.status === "reserved" && (
+        {item.status === "reserved" && isReserver && (
+          <button
+            onClick={unreserve}
+            disabled={busy}
+            className="mt-2 w-full rounded-full border px-3 py-1.5 text-sm font-semibold hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {busy ? "Unreserving…" : "Unreserve"}
+          </button>
+        )}
+        {item.status === "reserved" && !isReserver && (
           <p className="mt-2 text-xs font-medium text-amber-700">Reserved</p>
         )}
         {item.status === "claimed" && (
